@@ -1,0 +1,29 @@
+<div style="font-family:Segoe UI, Arial, sans-serif; color:inherit; font-size:14px; margin:auto; line-height:1.8; max-width:800px; padding:0px;">
+  <h2 style="font-size:20px; font-weight:600; margin-top:5px; margin-bottom:16px;">Global Ecosystem</h2>
+
+  <p>Brantley Global (BG Company) operates an asset-backed ecosystem in which investments are directly tied to products and services within the platform. By investing in Brantley Global, participants are supporting the underlying economy of the ecosystem.</p>
+
+  <p>The system offers dividend payouts based on the chosen investment cycle, with a minimum term of eight quarters (2 years). If an investor initiates their deposit after the 15th day of a quarter, the investor's term will not begin until the following quarter. Investors begin receiving dividend payouts at the close of the first quarter of their investment. At the end of each investment term, investors receive any earned dividends and their original investment amount.</p>
+
+  <p>If the redemption process is not started within the redemption period of 2 years immediately following the close of their selected term, dividends will be forfeited. While all investor’s tokens are redeemable, if an investor fails to initiate the redemption process by the associated redemption period, the investor's tokens will automatically lock into the sequential cycle, and the original selected term will apply.</p>
+
+  <p>All dividend tokens are free to trade like any ERC20 token, and the associated call date of tokens can be found on the Dashboard within the "Balances" panel.</p>
+
+  <p>All investments and payouts are subject to defined grace periods, which account for processing timelines and potential delays due to operational or market conditions.</p>
+
+  <p>While the model is designed with real-world asset backing and operational safeguards, investing in this ecosystem involves risks regardless of how minimal they may be. Due to unforeseen market turns, liquidity constraints, or internal disruptions, there may be delays in capital return, reductions in payout, or—in extreme circumstances—a complete loss of invested capital.</p>
+
+  <p>In situations where funds cannot be returned at maturity, settlements will be processed as promptly as possible, with complete transparency and consistent communication.</p>
+
+  <p>Brantley Global is not registered as a securities issuer under any national jurisdiction. Investments are made at the discretion of the participant and do not constitute a regulated financial product.</p>
+
+  <p>Dividend payouts are not guaranteed and are subject to the performance of the underlying ecosystem and prevailing market conditions. The market value of GBDo tokens may fluctuate independently of dividend performance or redemption schedules.</p>
+
+  <p>All termed contracts, to include dividend and venture contracts, are considered term vault contracts and any investment into the contract is irreversible. Any investment will be locked in user's selected term and the user will not have acces to invested funds until the term closes. Dividend or venture vault specific payouts are paid quarterly based on per contract.</p>
+  
+  <p>Investors are responsible for understanding and complying with any tax obligations arising from dividends, token trades, or redemptions.</p>
+
+  <p>Brantley Global reserves the right to delay or modify payout schedules in the event of force majeure, including but not limited to natural disasters, cyberattacks, or systemic market failures.</p>
+
+  <p>Investors are strongly encouraged to assess their personal risk tolerance and consult a financial advisor before participating in the Global ecosystem.</p>
+</div>
