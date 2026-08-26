@@ -1,0 +1,358 @@
+"use client";
+
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import { CheckoutModal } from "~~/components/purchase/checkoutModal";
+import { useCheckoutStore } from "~~/components/purchase/useCheckoutStore";
+import { DModal } from "~~/components/common/descriptionModal";
+import { Modal } from "~~/components/common/modal";
+import { StablecoinRate } from "~~/lib/exchangeRates";
+import { WalletConnectButton } from "~~/utils/globalEco/walletConnectButton";
+
+type AssetVariation = { label: string; apriceInGBDo: bigint; };
+
+type Props = {
+  data: {
+    asset: {
+      assetId: number;
+      basePriceInGBDo: number;
+      baseDays: number;
+      perUnitDelay: string;
+      variant: "eseries" | "xseries";
+    };
+    metadata: {
+      name?: string;
+      model?: string;
+      description?: string;
+      image?: string;
+      altImage?: string;
+    };
+  };
+};
+
+const fiatToStablecoin: Record<string, string> = {
+  USD: "USDC",
+  EUR: "EURC",
+  USDT: "USDT",
+  DAI: "DAI",
+  GBP: "GBPT",
+  JPY: "JPYC",
+  CAD: "QCAD",
+  AUD: "AUDD",
+  BRL: "BRL1",
+  CHF: "XCHF",
+  INR: "INRX",
+  SGD: "XSGD",
+  ZAR: "ZARP",
+  KRW: "KRT",
+  MXN: "MMXN",
+  PYUSD: "PYUSD",
+  FDUSD: "FDUSD",
+  NGN: "NGNT",
+  ARS: "ARSX",
+  TRY: "TRYX"
+};
+
+
+const variationGroupsMap: Record<"eseries" | "xseries", Record<string, AssetVariation[]>> = {
+  eseries: {
+    epanel: [
+      { label: "120v Split Phase @60Hz", apriceInGBDo: BigInt(0) },
+      { label: "Customize", apriceInGBDo: BigInt(1_100_000_000) },
+    ],
+    monitoring: [
+      { label: "No Monitoring", apriceInGBDo: BigInt(0) },
+      { label: "Monitoring", apriceInGBDo: BigInt(2_200_000_000) },
+    ],
+    etie: [
+      { label: "Stand Alone", apriceInGBDo: BigInt(0) },
+      { label: "Grid Tie (225amp Rating)", apriceInGBDo: BigInt(3_850_000_000) },
+      { label: "Grid Tie (400amp Rating)", apriceInGBDo: BigInt(5_500_000_000) },
+      { label: "Grid Tie (630amp Rating)", apriceInGBDo: BigInt(11_000_000_000) },
+    ],
+  },
+  xseries: {
+    xpanel: [
+      { label: "480v 3 Phase @60Hz", apriceInGBDo: BigInt(0) },
+      { label: "Customize", apriceInGBDo: BigInt(5_500_000_000) },
+    ],
+    monitoring: [
+      { label: "No Monitoring", apriceInGBDo: BigInt(0) },
+      { label: "Monitoring", apriceInGBDo: BigInt(2_200_000_000) },
+    ],
+    xtie: [
+      { label: "Stand Alone", apriceInGBDo: BigInt(0) },
+      { label: "Grid Tie (400amp Rating)", apriceInGBDo: BigInt(5_500_000_000) },
+      { label: "Grid Tie (1260amp Rating)", apriceInGBDo: BigInt(22_000_000_000) },
+      { label: "Grid Tie (2100amp Rating)", apriceInGBDo: BigInt(30_800_000_000) },
+    ],
+  },
+};
+
+const galleryMap: Record<"eseries" | "xseries", { 
+  pool: string[];
+  main: string;
+  hover: string 
+}> = {
+  eseries: {
+    pool: ["/LegionE1.png", "/LegionE2.png", "/LegionE3.png", "/LegionE4.png", "/LegionE5.png", "LegionE6.png"],
+    main: "/LegionE1.png",
+    hover: "/LegionE6.png"
+  },
+  xseries: {
+    pool: ["/LegionX1.png", "/LegionX2.png", "/LegionX3.png",  "/LegionX4.png", "/LegionX5.png", "LegionX6.png"],
+    main: "/LegionX2.png",
+    hover: "/LegionX6.png"
+  }
+};
+
+export const AssetCard: React.FC<Props> = ({ data }) => {
+  const { asset: itemAsset, metadata } = data;
+  const variationGroups = variationGroupsMap[itemAsset.variant];
+
+  const [selectedVariations, setSelectedVariations] = useState<Record<string, AssetVariation>>({});
+  const [selectedCurrency, setSelectedCurrency] = useState("GBDo");
+  const [paymentMethod, setPaymentMethod] = useState<"cash" | "crypto">("crypto");
+  const [cryptoType, setCryptoType] = useState<"native" | "stable">("native");
+  const [selectedStablecoin, setSelectedStablecoin] = useState("GBDo");
+
+  const [convertedPrice, setConvertedPrice] = useState(0);
+  const [quantity, setQuantity] = useState(1);
+  const [buyModalOpen, setBuyModalOpen] = useState(false);
+  const [descriptionModalOpen, setDescriptionModalOpen] = useState(false);
+  const [walletModalOpen, setWalletModalOpen] = useState(false);
+  const rawBasePriceGBDo = Number(itemAsset.basePriceInGBDo) / 1e6;
+  const [modalOpen, setModalOpen] = useState(false);
+  const variantKey = itemAsset.variant;
+  const galleryImages = galleryMap[variantKey]?.pool || [];
+  const variantImages = galleryMap[itemAsset.variant];
+  const [imageSrc, setImageSrc] = useState(variantImages.main);
+  const thumbnailRefs = useRef<(HTMLImageElement | null)[]>([]);
+    
+  const store = useCheckoutStore.getState();
+  const resetForm = () => {
+    setSelectedVariations({});
+    setSelectedCurrency("GBDo");
+    setPaymentMethod("crypto");
+    setCryptoType("native");
+    setSelectedStablecoin("GBDo");
+    setConvertedPrice(0);
+    setQuantity(1);
+    setImageSrc(variantImages.main);
+  };
+
+  useEffect(() => {
+    const initial: Record<string, AssetVariation> = {};
+    Object.entries(variationGroups).forEach(([key, options]) => {
+      initial[key] = options[0];
+    });
+    setSelectedVariations(initial);
+  }, [itemAsset.variant]);
+
+  const basePriceGBDo = useMemo(() => {
+    const base = BigInt(itemAsset.basePriceInGBDo ?? 0);
+    const variationTotal = Object.values(selectedVariations).reduce(
+      (sum, v) => sum + BigInt(v.apriceInGBDo ?? 0),
+      BigInt(0)
+    );
+    return Number(base + variationTotal) / 1e6;
+  }, [itemAsset.basePriceInGBDo, selectedVariations]);
+
+
+  const [exchangeData, setExchangeData] = useState<{
+    rates: StablecoinRate[];
+    gbdoRate: number;
+    lastUpdated: number;
+  } | null>(null);
+
+
+  useEffect(() => {
+    if (!exchangeData || !selectedCurrency) return;
+
+    const tokenData = exchangeData.rates.find(r => r.symbol === selectedCurrency);
+    const rateAgainstGBDo = tokenData?.rateAgainstGBDo ?? 1;
+
+    setConvertedPrice(basePriceGBDo * rateAgainstGBDo);
+  }, [basePriceGBDo, selectedCurrency, exchangeData]);
+
+  useEffect(() => {
+    const tokenSymbol =
+      paymentMethod === "cash"
+        ? null
+        : cryptoType === "native"
+        ? "GBDo"
+        : selectedStablecoin;
+
+    store.setField("quantity", quantity);
+    store.setField("tokenSymbol", tokenSymbol || "");
+    store.setField("estimatedTotal", (convertedPrice * quantity).toString());
+    store.setField("estimatedEscrow", ((convertedPrice * quantity) / 2).toString());
+    store.setField("paymentMethod", paymentMethod === "cash" ? "cash" : cryptoType);
+  }, [quantity, selectedCurrency, convertedPrice, paymentMethod, cryptoType, selectedStablecoin]);
+
+
+  const deliveryDays =
+    itemAsset.baseDays + (quantity - 1) * Number(itemAsset.perUnitDelay);
+
+  
+
+  return (
+    <div className="bg-base-100 rounded-xl shadow-md p-4 flex flex-col space-y-4">
+      {galleryImages.length > 0 && (
+        <img
+          src={imageSrc}
+          alt="..."
+          onMouseEnter={() => setImageSrc(variantImages.hover)}
+          onMouseLeave={() => setImageSrc(variantImages.main)}
+          onClick={() => setModalOpen(true)}
+          className="rounded-lg h-50 object-cover mt-1 transition-transform duration-200 hover:scale-105 cursor-pointer"
+        />
+      )}
+
+
+      <div className="flex items-center justify-between gap-4">
+        {/* Title and Model */}
+        <div>
+          <h3 className="text-md font-light">{metadata.name}</h3>
+          <p className="text-xs text-info-400">{metadata.model}</p>
+        </div>
+
+        {/* Description Button */}
+        <button
+          onClick={() => setDescriptionModalOpen(true)}
+          className="btn btn-ghost border-none outline-none btn-sm text-info hover:bg-base-300"
+        >
+          Description ▸
+        </button>
+      </div>
+
+      <p className="flex items-baseline gap-1">
+        <img
+          src="/globalw.png"
+          className="w-3 h-3 ml-3 opacity-80 mt-2"
+        />
+        <span className="text-lg font-light">
+          {rawBasePriceGBDo.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      </p>
+
+      {/* Quantity Controls */}
+      <div className="flex justify-center items-center gap-2">
+        <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="btn btn-xs">–</button>
+        <span className="font-medium">{quantity}</span>
+        <button onClick={() => setQuantity(q => q + 1)} className="btn btn-xs">+</button>
+      </div>
+
+      {/* Checkout Button */}
+      <div className="mt-0 w-full">
+        <button
+          className="btn bg-white/5 text-white font-light text-xs rounded-md w-full py-2 hover:bg-secondary/30 transition-all"
+          onClick={() => {
+            useCheckoutStore.getState().setField("asset", {
+              id: itemAsset.assetId,
+              name: metadata.name ?? "Unnamed Asset",
+              metadataCID: metadata.altImage ?? metadata.image ?? "",
+              basePriceInGBDo: BigInt(itemAsset.basePriceInGBDo ?? 0),
+              baseDays: itemAsset.baseDays,
+              perUnitDelay: Number(itemAsset.perUnitDelay ?? "0"),
+              variant: itemAsset.variant,
+            });
+
+            setBuyModalOpen(true);
+          }}
+        >
+          CONFIGURE
+        </button>
+      </div>
+
+
+      {/* Description Modal */}
+      {descriptionModalOpen && (
+        <DModal isOpen={modalOpen} onClose={() => setDescriptionModalOpen(false)}>
+          <div className="max-h-200 max-w-400 overflow-y-auto whitespace-pre-line text-sm mb-8 px-6 text-justify">
+            {(metadata.description || "")
+              .split("|||")
+              .map((para, idx) => (
+                <p key={idx} className="mb-3">{para}</p>
+              ))}
+          </div>
+        </DModal>
+      )}
+
+      {/* Checkout Modal */}
+      {buyModalOpen && (
+        <CheckoutModal
+          isOpen={buyModalOpen} 
+          selectedCurrency={selectedCurrency}
+          variationGroups={variationGroups}
+          selectedVariations={selectedVariations}
+          setSelectedVariations={setSelectedVariations}
+          onClose={() => {
+            setBuyModalOpen(false);
+            resetForm();
+          }}
+          openWalletModal={() => setWalletModalOpen(true)}
+        />
+      )}
+
+      {/* Wallet Modal — render independently */}
+      {walletModalOpen && (
+        <WalletConnectButton
+          isOpen={walletModalOpen}
+          onClose={() => setWalletModalOpen(false)}
+        />
+      )}
+
+      <Modal isOpen={modalOpen} onClose={() => setModalOpen(false)}>
+        <div className="flex flex-col h-[70vh]">
+          {/* Title */}
+          <div className="px-4 py-2 border-b border-base-300">
+            <h2 className="text-lg font-light uppercase text-center text-primary">
+              {metadata.model} | {metadata.name}
+            </h2>
+          </div>
+
+          {/* Main Image */}
+          <div className="flex-grow flex items-center justify-center">
+            <img
+              src={imageSrc}
+              alt="Selected Preview"
+              className="max-w-full max-h-full rounded-lg transition-transform duration-300 hover:scale-101"
+            />
+          </div>
+
+          {/* Thumbnail Gallery */}
+          <div className="flex gap-2 overflow-x-auto px-4 py-2 border-t border-base-300">
+            {galleryImages.map((img, idx) => (
+              <img
+                key={idx}
+                ref={(el) => {
+                  thumbnailRefs.current[idx] = el;
+                }}
+                src={img}
+                alt={`Asset ${idx + 1}`}
+                className={`h-30 w-auto object-cover rounded-md cursor-pointer hover:scale-105 transition ${
+                  img === imageSrc ? "ring ring-info" : ""
+                }`}
+                onClick={() => {
+                  setImageSrc(img);
+                  // Scroll into view
+                  setTimeout(() => {
+                    thumbnailRefs.current[idx]?.scrollIntoView({
+                      behavior: "smooth",
+                      inline: "center",
+                      block: "nearest",
+                    });
+                  }, 0);
+                }}
+              />
+            ))}
+          </div>
+        </div>
+      </Modal>
+
+      <p className="text-sm text-light text-gray-500 text-center mt-1">
+        Lead Time: {deliveryDays} day{deliveryDays === 1 ? "" : "s"}
+      </p>
+    </div>
+  );
+};
